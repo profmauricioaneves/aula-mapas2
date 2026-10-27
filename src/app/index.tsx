@@ -9,6 +9,16 @@ type Position = {
   longitude: number;
 };
 
+//novo para aula de hoje
+type Address = {
+  street?: string;
+  streetNumber?: string;
+  district?: string;
+  city?: string;
+  region?: string;
+  postalCode?: string;
+};
+
 // Página HTML com Leaflet + OpenStreetMap
 const MAP_HTML = `
 <!DOCTYPE html>
@@ -58,6 +68,10 @@ export default function Index() {
   const [sensorMessage, setSensorMessage] = useState("");
   const webViewRef = useRef<WebView>(null);
 
+  // parte para aula de hoje
+const [address, setAddress] = useState<Address | null>(null);
+const [addressError, setAddressError] = useState<string | null>(null);
+
   // Pede permissão e busca a localização do aparelho.
   useEffect(() => {
     let active = true;
@@ -70,13 +84,54 @@ export default function Index() {
           setLocationError("A permissão de localização foi negada.");
           return;
         }
-        const result = await Location.getCurrentPositionAsync({});
-        if (active) {
-          setPosition({
-            latitude: result.coords.latitude,
-            longitude: result.coords.longitude,
-          });
-        }
+
+       // const result = await Location.getCurrentPositionAsync({});
+        //if (active) {
+        //  setPosition({
+        //    latitude: result.coords.latitude,
+        //    longitude: result.coords.longitude,
+        //  });
+        //}
+
+        // SUBSTITUIR POR
+const result = await Location.getCurrentPositionAsync({});
+if (!active) return;
+
+setPosition({
+  latitude: result.coords.latitude,
+  longitude: result.coords.longitude,
+});
+
+// ===== TÓPICO 2: geolocalização reversa =====
+try {
+  const geocode = await Location.reverseGeocodeAsync({
+    latitude: result.coords.latitude,
+    longitude: result.coords.longitude,
+  });
+
+  if (!active) return;
+
+  if (geocode.length === 0) {
+    setAddressError("Endereço não encontrado para estas coordenadas.");
+    return;
+  }
+
+  const first = geocode[0];
+  setAddress({
+    street: first.street ?? undefined,
+    streetNumber: first.streetNumber ?? undefined,
+    district: first.district ?? undefined,
+    city: first.city ?? undefined,
+    region: first.region ?? undefined,
+    postalCode: first.postalCode ?? undefined,
+  });
+} catch {
+  if (active) {
+    setAddressError("Não foi possível converter as coordenadas em endereço.");
+  }
+}
+// ===== fim do tópico 2 =====
+
       } catch {
         if (active) {
           setLocationError("Não foi possível obter a localização.");
@@ -130,6 +185,12 @@ export default function Index() {
       subscription?.remove();
     };
   }, []);
+  //nova função para aula de hoje
+  function formatAddress(addr: Address) {
+    return [addr.street, addr.streetNumber, addr.district, addr.city, addr.region, addr.postalCode]
+      .filter(Boolean)
+      .join(", ");
+  }
 
   if (locationError) {
     return (
@@ -150,6 +211,7 @@ export default function Index() {
 
   return (
     <View style={styles.container}>
+
       <WebView
         ref={webViewRef}
         style={styles.map}
@@ -165,6 +227,12 @@ export default function Index() {
       />
 
       <View style={styles.info}>
+      <Text style={styles.address}>
+        {address
+          ? formatAddress(address) || "Endereço não encontrado"
+          : addressError ?? "Buscando endereço..."}
+          </Text>
+
         <Text>Latitude: {position.latitude.toFixed(5)}</Text>
         <Text>Longitude: {position.longitude.toFixed(5)}</Text>
         <Text>
@@ -190,6 +258,11 @@ const styles = StyleSheet.create({
     borderTopColor: "#cccccc",
     gap: 6,
   },
+address: {
+  fontWeight: "600",
+  fontSize: 15,
+  color: "#1a1a1a",
+},
   messageScreen: {
     flex: 1,
     justifyContent: "center",
